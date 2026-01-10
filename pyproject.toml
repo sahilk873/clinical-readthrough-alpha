@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clinical-alpha"
+version = "0.1.0"
+description = "Quant research platform testing readthrough effects of clinical-trial and FDA events on public healthcare companies"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "httpx>=0.27.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "yfinance>=0.2.36",
+    "networkx>=3.1",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.0",
+    "rich>=13.7.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.13.0",
+    "statsmodels>=0.14.0",
+    "tqdm>=4.66.0",
+    "pyarrow>=14.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.5.0",
+]
+polygon = ["polygon-api-client>=1.13.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["clinical_alpha*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
