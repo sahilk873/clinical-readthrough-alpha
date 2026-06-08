@@ -2,10 +2,14 @@
 
 Implements:
 - Multiple weighting schemes (equal, volatility-target, risk-parity, min-variance)
+- Graph-proximity and event-confidence-aware position sizing
 - Black-Litterman global portfolio optimization
 - Hierarchical Risk Parity (Lopez de Prado 2016)
 - Bayesian mean-variance optimization
 - TC-aware portfolio optimization
+- Event-aware reward decomposition (alpha vs beta vs TC)
+- Dynamic exit logic with stop-loss, take-profit, trailing-stop
+- Intra-trade PnL tracking and excursion analysis
 - Sophisticated transaction cost models (linear, quadratic, volume-based)
 - Position sizing with volatility targeting and Kelly
 - Sector and factor neutralization
@@ -350,6 +354,12 @@ class ReadthroughBacktest:
         long_short: bool = False,
         short_rebate_rate: float = 0.003,
         short_fee_bps: float = 35.0,
+        stop_loss: float = 0.0,
+        take_profit: float = 0.0,
+        trailing_stop: float = 0.0,
+        min_weight: float = 0.01,
+        max_single_position: float = 0.30,
+        position_scaling: str = "equal",
     ):
         self.graph = graph
         self.prices = prices
@@ -366,11 +376,19 @@ class ReadthroughBacktest:
         self.long_short = long_short
         self.short_rebate_rate = short_rebate_rate
         self.short_fee_bps = short_fee_bps
+        self.stop_loss = stop_loss
+        self.take_profit = take_profit
+        self.trailing_stop = trailing_stop
+        self.min_weight = min_weight
+        self.max_single_position = max_single_position
+        self.position_scaling = position_scaling
 
     def _compute_weights(
         self,
         peer_tickers: list[str],
         event_date: pd.Timestamp,
+        event_ticker: str = "",
+        event: Optional[dict] = None,
     ) -> Optional[pd.Series]:
         if not peer_tickers:
             return None
@@ -379,6 +397,9 @@ class ReadthroughBacktest:
 
         if self.weighting == "equal":
             weights = pd.Series(1.0 / n, index=peer_tickers)
+
+        elif self.weighting == "graph_proximity":
+            weights = self._compute_graph_proximity_weights(peer_tickers, event_ticker)
 
         elif self.weighting == "volatility_target":
             vol_list: list[float] = []
@@ -393,7 +414,7 @@ class ReadthroughBacktest:
             raw_w = np.array(
                 [self.vol_target / (v * np.sqrt(252)) if v > 0 else 0.01 for v in vols_arr]
             )
-            raw_w = np.clip(raw_w, 0, 0.30)
+            raw_w = np.clip(raw_w, 0, self.max_single_position)
             weights = pd.Series(raw_w / raw_w.sum(), index=peer_tickers)
 
         elif self.weighting == "min_variance":
@@ -458,8 +479,47 @@ class ReadthroughBacktest:
         else:
             weights = pd.Series(1.0 / n, index=peer_tickers)
 
+        if self.position_scaling == "confidence" and event:
+            alpha_score = self._event_alpha_score(event)
+            weights = weights * (0.5 + 0.5 * alpha_score)
+
+        if self.position_scaling == "graph_proximity" and event_ticker:
+            prox = self._compute_graph_proximity_weights(peer_tickers, event_ticker)
+            weights = weights * prox
+
         weights = weights / weights.sum() * min(1.0, self.max_leverage)
+        weights = weights.clip(lower=self.min_weight)
+        weights = weights / weights.sum()
         return weights
+
+    def _event_alpha_score(self, event: dict) -> float:
+        score = event.get("confidence", 0.7)
+        event_type = event.get("event_type", "")
+        if event_type == "fda_approval":
+            score = min(1.0, score * 1.15)
+        elif event_type == "fda_rejection":
+            score = min(1.0, score * 1.10)
+        direction = event.get("direction", "positive")
+        if direction == "positive":
+            score = score * 1.0
+        elif direction == "negative":
+            score = score * 0.9
+        return float(np.clip(score, 0.1, 1.0))
+
+    def _compute_graph_proximity_weights(
+        self, peer_tickers: list[str], event_ticker: str
+    ) -> pd.Series:
+        all_peers = self.graph.get_peer_companies(event_ticker, max_distance=3)
+        score_map: dict[str, float] = {}
+        if all_peers:
+            for t, s in all_peers:
+                score_map[t] = s
+        weights = pd.Series(
+            {t: score_map.get(t, 0.01) for t in peer_tickers},
+            index=peer_tickers,
+        )
+        weights = weights.clip(lower=self.min_weight)
+        return weights / weights.sum()
 
     def _estimate_daily_volume_pct(
         self,
@@ -504,7 +564,9 @@ class ReadthroughBacktest:
             if len(available_peers) < 1:
                 continue
 
-            weights = self._compute_weights(available_peers, event_date)
+            weights = self._compute_weights(
+                available_peers, event_date, event_ticker=ticker, event=event.to_dict()
+            )
             if weights is None:
                 continue
 
@@ -514,10 +576,13 @@ class ReadthroughBacktest:
                     weights.values if self.weighting != "equal" else None,
                     event_date,
                     hp,
+                    event=event.to_dict(),
                 )
                 if result is not None:
                     result["event_id"] = event.get("event_id", "")
                     result["company_ticker"] = ticker
+                    result["event_type"] = event.get("event_type", "")
+                    result["event_confidence"] = event.get("confidence", 0.0)
                     result["holding_period"] = hp
                     result["top_k"] = top_k
                     result["weighting"] = self.weighting
@@ -530,6 +595,10 @@ class ReadthroughBacktest:
                 continue
             df = pd.DataFrame(trades)
             compound_return = float((1 + df["total_return"]).prod() - 1) if len(df) > 0 else 0.0
+            alpha_return_mean = float(df.get("alpha_return", df["total_return"]).mean())
+            exit_reasons = (
+                df["exit_reason"].value_counts().to_dict() if "exit_reason" in df.columns else {}
+            )
             aggregated[hp] = {
                 "n_trades": len(trades),
                 "mean_return": round(float(df["total_return"].mean()), 6),
@@ -540,6 +609,13 @@ class ReadthroughBacktest:
                 "mean_peer_return": round(float(df["peer_return"].mean()), 6),
                 "mean_benchmark_return": round(
                     float(df.get("benchmark_return", df["peer_return"]).mean()), 6
+                ),
+                "mean_alpha_return": round(alpha_return_mean, 6),
+                "mean_event_alpha_score": round(
+                    float(df.get("event_alpha_score", df["total_return"]).mean()), 4
+                ),
+                "mean_avg_graph_proximity": round(
+                    float(df.get("avg_graph_proximity", 0.5).mean()), 4
                 ),
                 "sharpe": (
                     round(
@@ -568,6 +644,11 @@ class ReadthroughBacktest:
                 if "cumulative_return" in df.columns and not df["cumulative_return"].empty
                 else 0.0,
                 "avg_tc_bps": round(float(df["transaction_cost"].mean() * 10000), 2),
+                "early_exit_pct": round((df["actual_days_held"] < df["scheduled_days"]).mean(), 4)
+                if "actual_days_held" in df.columns and "scheduled_days" in df.columns
+                else 0.0,
+                "exit_reason_breakdown": exit_reasons,
+                "mean_intra_trade_sharpe": round(float(df.get("sharpe_intra", 0.0).mean()), 4),
             }
 
         all_trades = []
@@ -588,6 +669,7 @@ class ReadthroughBacktest:
         weights: Optional[np.ndarray],
         event_date: pd.Timestamp,
         holding_period: int,
+        event: Optional[dict] = None,
     ) -> Optional[dict]:
         if event_date not in self.prices.index:
             try:
@@ -603,30 +685,29 @@ class ReadthroughBacktest:
         except (KeyError, IndexError):
             return None
 
-        exit_idx = entry_idx + holding_period
-        if exit_idx >= len(self.prices.index):
+        max_exit_idx = entry_idx + holding_period
+        if max_exit_idx >= len(self.prices.index):
             return None
 
-        exit_date = self.prices.index[exit_idx]
-
-        entry_prices_list: list[float] = []
-        exit_prices_list: list[float] = []
         valid_peers: list[str] = []
         pw_list: list[float] = []
+        daily_price_series: list[np.ndarray] = []
 
         for i, p in enumerate(peer_tickers):
             if p not in self.prices.columns:
                 continue
             ep = self.prices[p].iloc[entry_idx]
-            xp = self.prices[p].iloc[exit_idx]
-            if pd.notna(ep) and pd.notna(xp) and ep > 0:
-                entry_prices_list.append(ep)
-                exit_prices_list.append(xp)
-                valid_peers.append(p)
-                if weights is not None and i < len(weights):
-                    pw_list.append(weights[i])
-                else:
-                    pw_list.append(1.0)
+            if pd.isna(ep) or ep <= 0:
+                continue
+            slice_prices = self.prices[p].iloc[entry_idx : max_exit_idx + 1].values
+            if len(slice_prices) < 2 or any(pd.isna(slice_prices)):
+                continue
+            daily_price_series.append(slice_prices)
+            valid_peers.append(p)
+            if weights is not None and i < len(weights):
+                pw_list.append(weights[i])
+            else:
+                pw_list.append(1.0)
 
         if len(valid_peers) < 1:
             return None
@@ -634,10 +715,43 @@ class ReadthroughBacktest:
         pw_arr = np.array(pw_list)
         pw_arr = pw_arr / pw_arr.sum()
 
-        peer_returns_arr = np.array(
-            [(x / e - 1) for e, x in zip(entry_prices_list, exit_prices_list)]
-        )
-        weighted_peer_return = float(pw_arr @ peer_returns_arr)
+        price_array = np.column_stack(daily_price_series)
+        ret_array = price_array / price_array[0:1, :] - 1
+        port_value_series = ret_array @ pw_arr
+
+        exit_idx = len(port_value_series) - 1
+        peak_value = 0.0
+        max_drawdown = 0.0
+        max_runup = 0.0
+        exit_reason = "time"
+
+        has_stop = self.stop_loss > 0
+        has_tp = self.take_profit > 0
+        has_trail = self.trailing_stop > 0
+
+        for t in range(1, len(port_value_series)):
+            cv = port_value_series[t]
+            peak_value = max(peak_value, cv)
+            dd = peak_value - cv
+            max_drawdown = max(max_drawdown, dd)
+
+            if has_tp and cv >= self.take_profit:
+                exit_idx = t
+                exit_reason = "take_profit"
+                break
+            if has_stop and cv <= -self.stop_loss:
+                exit_idx = t
+                exit_reason = "stop_loss"
+                break
+            if has_trail and peak_value > 0 and cv <= peak_value - self.trailing_stop:
+                exit_idx = t
+                exit_reason = "trailing_stop"
+                break
+
+        max_runup = float(peak_value)
+        actual_days_held = exit_idx
+
+        total_return = float(port_value_series[exit_idx])
 
         tc_bps = compute_transaction_cost(
             trade_size_pct=1.0 / len(valid_peers),
@@ -645,29 +759,64 @@ class ReadthroughBacktest:
             base_tc_bps=self.base_tc_bps,
             slippage_bps=self.slippage_bps,
         )
-
         total_tc = tc_bps / 10000 * 2
-        total_return = weighted_peer_return - total_tc
+        total_return_net = total_return - total_tc
 
-        if "SPY" in self.prices.columns:
-            spy_entry = self.prices["SPY"].iloc[entry_idx]
-            spy_exit = self.prices["SPY"].iloc[exit_idx]
-            bench_return = (spy_exit / spy_entry - 1) if spy_entry > 0 else 0
+        exit_date_idx = entry_idx + exit_idx
+        if exit_date_idx >= len(self.prices.index):
+            exit_date_idx = entry_idx + exit_idx
+        exit_date = self.prices.index[exit_date_idx]
+
+        bench_return = 0.0
+        bench_col = None
+        for b in ["XBI", "XLV", "SPY"]:
+            if b in self.prices.columns:
+                bench_col = b
+                break
+        if bench_col:
+            b_entry = self.prices[bench_col].iloc[entry_idx]
+            b_exit = self.prices[bench_col].iloc[exit_date_idx]
+            bench_return = (b_exit / b_entry - 1) if b_entry > 0 else 0.0
+
+        peer_entry_price = price_array[0]
+        peer_exit_price = price_array[exit_idx]
+        if len(peer_entry_price.shape) == 1:
+            peer_returns_direct = peer_exit_price / peer_entry_price - 1
         else:
-            bench_return = 0
+            peer_returns_direct = peer_exit_price / peer_entry_price - 1
+        weighted_peer_return_direct = float(pw_arr @ peer_returns_direct)
 
-        cumulative_return = (1 + total_return) - 1
+        alpha_return = total_return_net - bench_return
+
+        intra_trade_vol = float(np.std(port_value_series[: exit_idx + 1])) if exit_idx > 1 else 0.0
+        sharpe_intra = (
+            total_return / intra_trade_vol * np.sqrt(252 / max(actual_days_held, 1))
+            if intra_trade_vol > 0
+            else 0.0
+        )
+
+        event_alpha = self._event_alpha_score(event) if event else 0.5
 
         return {
             "entry_date": entry_date,
             "exit_date": exit_date,
             "n_peers": len(valid_peers),
-            "peer_return": round(float(weighted_peer_return), 6),
+            "peer_return": round(float(weighted_peer_return_direct), 6),
             "transaction_cost": round(float(total_tc), 6),
-            "total_return": round(float(total_return), 6),
+            "total_return": round(float(total_return_net), 6),
             "benchmark_return": round(float(bench_return), 6),
-            "cumulative_return": round(float(cumulative_return), 6),
-            "excess_return": round(float(total_return - bench_return), 6),
+            "alpha_return": round(float(alpha_return), 6),
+            "excess_return": round(float(total_return_net - bench_return), 6),
+            "cumulative_return": round(float(total_return_net), 6),
+            "actual_days_held": actual_days_held,
+            "scheduled_days": holding_period,
+            "exit_reason": exit_reason,
+            "max_runup": round(max_runup, 6),
+            "max_drawdown": round(max_drawdown, 6),
+            "intra_trade_vol": round(intra_trade_vol, 6),
+            "sharpe_intra": round(sharpe_intra, 4),
+            "event_alpha_score": round(event_alpha, 4),
+            "avg_graph_proximity": round(float(pw_arr.max()), 4),
             "peers": valid_peers,
             "weighting": self.weighting,
         }
@@ -699,6 +848,11 @@ class ReadthroughBacktest:
                     "sortino": metrics.get("sortino", 0),
                     "max_dd": metrics.get("max_drawdown", 0),
                     "avg_tc_bps": metrics.get("avg_tc_bps", 0),
+                    "mean_alpha_return": metrics.get("mean_alpha_return", 0),
+                    "mean_event_score": metrics.get("mean_event_alpha_score", 0),
+                    "mean_graph_prox": metrics.get("mean_avg_graph_proximity", 0),
+                    "early_exit_pct": metrics.get("early_exit_pct", 0),
+                    "intra_sharpe": metrics.get("mean_intra_trade_sharpe", 0),
                 }
             )
 
