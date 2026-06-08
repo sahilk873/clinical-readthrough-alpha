@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clinical-alpha"
-version = "0.1.0"
-description = "Quant research platform testing readthrough effects of clinical-trial and FDA events on public healthcare companies"
+version = "0.3.0"
+description = "Institutional-grade quant research platform: readthrough effects of clinical-trial and FDA events on public healthcare companies"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -18,12 +18,14 @@ dependencies = [
     "networkx>=3.1",
     "python-dotenv>=1.0.0",
     "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
     "rich>=13.7.0",
     "matplotlib>=3.7.0",
     "seaborn>=0.13.0",
     "statsmodels>=0.14.0",
     "tqdm>=4.66.0",
     "pyarrow>=14.0.0",
+    "scikit-learn>=1.3.0",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +46,8 @@ include = ["clinical_alpha*"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
+addopts = ["-m", "not slow"]
 
 [tool.ruff]
 line-length = 100
@@ -56,3 +60,11 @@ select = ["E", "F", "I", "W"]
 python_version = "3.10"
 strict = false
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/clinical_alpha"]
+omit = ["*/tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 60

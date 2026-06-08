@@ -17,7 +17,6 @@ def sample_graph():
     """Create a sample graph for testing."""
     graph = ClinicalGraph()
 
-    # Add companies
     companies = {
         "PFE": "Pfizer Inc",
         "MRK": "Merck & Co Inc",
@@ -28,24 +27,19 @@ def sample_graph():
     for ticker, name in companies.items():
         graph.add_company_node(ticker, name=name)
 
-    # Add trials
     for i in range(5):
         nct_id = f"NCT{i + 1:08d}"
         graph.add_trial_node(nct_id, title=f"Trial {i + 1}", phase="Phase 3", status="COMPLETED")
 
-    # Add drugs
     for drug in ["Drug X", "Drug Y", "Therapy Z"]:
         graph.add_drug_node(drug)
 
-    # Add indications
     for cond in ["Cancer", "Diabetes", "Autoimmune"]:
         graph.add_indication_node(cond)
 
-    # Add phases
     for phase in ["Phase 3", "Phase 2", "Phase 1"]:
         graph.add_phase_node(phase)
 
-    # Add edges
     co_ids = [f"COMPANY::{t}" for t in companies]
     trial_ids = [f"TRIAL::NCT{i + 1:08d}" for i in range(5)]
     drug_ids = ["DRUG::drug x", "DRUG::drug y", "DRUG::therapy z"]
@@ -60,6 +54,15 @@ def sample_graph():
         graph.add_indication_edge(trial_ids[i], ind_ids[i])
     for i in range(3):
         graph.add_phase_edge(trial_ids[i], phase_ids[0])
+
+    similarity_df = pd.DataFrame(
+        {
+            "ticker_a": ["PFE", "PFE", "MRK", "MRK", "JNJ", "JNJ"],
+            "ticker_b": ["MRK", "JNJ", "PFE", "JNJ", "PFE", "MRK"],
+            "similarity": [0.6, 0.4, 0.6, 0.5, 0.4, 0.5],
+        }
+    )
+    graph.add_company_similarity_edges(similarity_df, threshold=0.2)
 
     return graph
 

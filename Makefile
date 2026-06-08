@@ -9,6 +9,9 @@ install-dev:
 test:
 	pytest tests/ -v --tb=short --cov=clinical_alpha
 
+test-full:
+	pytest tests/ -v --tb=short --cov=clinical_alpha -m "" -k ""
+
 lint:
 	ruff check src/clinical_alpha/ tests/ scripts/
 
@@ -34,8 +37,8 @@ sample-output:
 
 quality:
 	ruff check src/clinical_alpha/ tests/ scripts/
-	mypy src/clinical_alpha/ scripts/
-	pytest tests/ -v --tb=short --cov=clinical_alpha
+	mypy src/clinical_alpha/ scripts/ --ignore-missing-imports
+	pytest tests/ -v --tb=short --cov=clinical_alpha --cov-report=term-missing
 
 data-dirs:
 	mkdir -p data/raw data/processed data/samples reports/tables reports/figures

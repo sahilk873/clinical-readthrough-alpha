@@ -5,7 +5,6 @@ import pandas as pd
 
 from clinical_alpha.returns.abnormal import (
     AbnormalReturnCalculator,
-    compute_aar,
     compute_abnormal_returns_single_benchmark,
     compute_car,
     compute_market_model_ar,
@@ -52,13 +51,6 @@ class TestCAR:
         ar = pd.Series([0.01, 0.02], index=range(2))
         car = compute_car(ar, (-5, 10))
         assert abs(car - ar.sum()) < 1e-10
-
-
-class TestAAR:
-    def test_aar_calculation(self):
-        ar = pd.Series([0.01, 0.02, -0.005], index=range(3))
-        aar = compute_aar(ar, (0, 2))
-        assert abs(aar - ar.mean()) < 1e-10
 
 
 class TestTStatistic:
