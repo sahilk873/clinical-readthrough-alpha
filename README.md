@@ -1,8 +1,8 @@
 # Clinical Trial Readthrough Alpha
 
-**A serious quant research platform that tests whether clinical-trial and FDA events create readthrough effects in related public healthcare companies.**
+**A research framework that tests whether clinical-trial and FDA events create readthrough effects in related public healthcare companies.**
 
-Built with institutional-grade methodology — this is not a toy project. It's designed to demonstrate the engineering discipline, statistical rigor, and investment process expected at a systematic hedge fund or quantitative asset manager.
+Built with institutional-grade methodology — this is not a toy project.
 
 ---
 
@@ -276,11 +276,9 @@ reports/
 
 ---
 
-## Resume Bullets
+## Key Highlights
 
-If you use this project in interviews or on your resume, here are high-impact bullet points:
-
-> **Built a systematic quant research platform analyzing clinical-trial readthrough effects across 500+ healthcare equities using a heterogeneous graph-based peer identification methodology.**
+> **Built a research platform analyzing clinical-trial readthrough effects across 500+ healthcare equities using a heterogeneous graph-based peer identification methodology.**
 >
 > **Designed and implemented the full research pipeline: multi-source data ingestion (ClinicalTrials.gov, FDA, SEC EDGAR), fuzzy entity resolution, NetworkX graph construction, event study engine with 15+ statistical tests (bootstrap, permutation, Fama-French, GRS, Boehmer, Patell, Corrado rank, Bayes factors, Bai-Perron), factor models (CAPM, FF3, FF5, Carhart 4F, Fama-MacBeth), and portfolio construction with vol-targeting, risk-parity, Hierarchical Risk Parity, Black-Litterman, and volume-based transaction costs.**
 >
