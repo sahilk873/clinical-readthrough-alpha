@@ -190,7 +190,7 @@ Stronger evidence — the confidence interval suggests the effect is not driven 
 ### If Bayes Factor > 3
 Positive Bayesian evidence for the readthrough effect. BF > 10 indicates strong evidence.
 
-## Limitations (Honest)
+## Limitations
 
 1. **Survivorship bias**: Our universe contains only companies that survived to appear in SEC EDGAR and have current price data. Delisted, acquired, or bankrupt peers are excluded.
 2. **Look-ahead bias**: Company names used for fuzzy matching reflect current names. We mitigate by matching at the CIK level where possible.

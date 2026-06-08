@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "clinical-alpha"
 version = "0.3.0"
-description = "Institutional-grade quant research platform: readthrough effects of clinical-trial and FDA events on public healthcare companies"
+description = "Research framework for clinical-trial and FDA event readthrough effects in public healthcare companies"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}

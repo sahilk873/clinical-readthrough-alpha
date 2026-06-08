@@ -2,7 +2,7 @@
 
 **A research framework that tests whether clinical-trial and FDA events create readthrough effects in related public healthcare companies.**
 
-Built with institutional-grade methodology — this is not a toy project.
+This repository packages the data ingestion, graph construction, event-study, risk, and reporting code used to evaluate the hypothesis.
 
 ---
 
@@ -12,9 +12,9 @@ Built with institutional-grade methodology — this is not a toy project.
 
 This is the **readthrough effect** — a well-known phenomenon in healthcare investing where information about one company is used to revalue related companies. This project provides a rigorous, reproducible framework to test and quantify this effect.
 
-## What Makes This Different
+## Methodological Scope
 
-| Dimension | Typical Quant Project | This Project |
+| Area | Baseline Approach | Implemented Approach |
 |-----------|----------------------|--------------|
 | **Data** | Clean CSV, one source | Messy real-world APIs, multi-source reconciliation |
 | **Methodology** | Single t-test | Bootstrap, permutation, Fama-French, GRS, multiple-testing correction, Bayesian tests, structural breaks |
@@ -276,21 +276,17 @@ reports/
 
 ---
 
-## Key Highlights
+## Implementation Summary
 
-> **Built a research platform analyzing clinical-trial readthrough effects across 500+ healthcare equities using a heterogeneous graph-based peer identification methodology.**
->
-> **Designed and implemented the full research pipeline: multi-source data ingestion (ClinicalTrials.gov, FDA, SEC EDGAR), fuzzy entity resolution, NetworkX graph construction, event study engine with 15+ statistical tests (bootstrap, permutation, Fama-French, GRS, Boehmer, Patell, Corrado rank, Bayes factors, Bai-Perron), factor models (CAPM, FF3, FF5, Carhart 4F, Fama-MacBeth), and portfolio construction with vol-targeting, risk-parity, Hierarchical Risk Parity, Black-Litterman, and volume-based transaction costs.**
->
-> **Implemented advanced risk modeling including regime-switching covariance, copula dependence, liquidity-adjusted VaR, and shrinkage covariance estimation — with signal analysis (IC decay, quantile spreads) and Brinson performance attribution.**
->
-> **Achieved comprehensive robustness validation across 8+ sensitivity dimensions including subsampling, multiple-testing corrections (Bonferroni, Holm, BH, FDR bootstrap), structural break detection, and cross-validation — ensuring honest reporting of statistical significance.**
->
-> **Engineered the system with pydantic-validated configuration, custom exception hierarchy, structured logging, data quality checks, and 190+ tests — demonstrating production-grade Python engineering.**
+- Built a research platform analyzing clinical-trial readthrough effects across 500+ healthcare equities using a heterogeneous graph-based peer identification methodology.
+- Designed and implemented the full research pipeline: multi-source data ingestion (ClinicalTrials.gov, FDA, SEC EDGAR), fuzzy entity resolution, NetworkX graph construction, event study engine with 15+ statistical tests (bootstrap, permutation, Fama-French, GRS, Boehmer, Patell, Corrado rank, Bayes factors, Bai-Perron), factor models (CAPM, FF3, FF5, Carhart 4F, Fama-MacBeth), and portfolio construction with vol-targeting, risk-parity, Hierarchical Risk Parity, Black-Litterman, and volume-based transaction costs.
+- Implemented advanced risk modeling including regime-switching covariance, copula dependence, liquidity-adjusted VaR, and shrinkage covariance estimation — with signal analysis (IC decay, quantile spreads) and Brinson performance attribution.
+- Achieved comprehensive robustness validation across 8+ sensitivity dimensions including subsampling, multiple-testing corrections (Bonferroni, Holm, BH, FDR bootstrap), structural break detection, and cross-validation — ensuring honest reporting of statistical significance.
+- Engineered the system with pydantic-validated configuration, custom exception hierarchy, structured logging, data quality checks, and 190+ tests — demonstrating production-grade Python engineering.
 
 ---
 
-## Limitations (Honest)
+## Limitations
 
 1. **Survivorship bias**: We only see companies that survived to appear in the data. Delisted, acquired, or bankrupt peers are missing.
 2. **Look-ahead bias**: Fuzzy matching uses current company names. We mitigate with explicit event-date-based filtering.
