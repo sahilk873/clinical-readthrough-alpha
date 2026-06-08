@@ -425,13 +425,13 @@ def generate_samples():
     ff3_results = {}
     for ticker in ["PFE", "MRK", "JNJ"]:
         capm_res = estimate_capm(sim_returns[ticker], mkt, rf)
-        ff3_res = estimate_ff3(sim_returns[ticker], factors, rf)
+        ff3_res = estimate_ff3(sim_returns[ticker], mkt, smb, hml, rf)
         ff3_results[ticker] = {
             "capm_alpha": capm_res["alpha"],
             "capm_beta": capm_res["beta"],
             "ff3_alpha": ff3_res["alpha"],
-            "capm_r2": capm_res["r_squared"],
-            "ff3_r2": ff3_res["r_squared"],
+            "capm_r2": capm_res["rsquared"],
+            "ff3_r2": ff3_res["rsquared"],
         }
     pd.DataFrame(ff3_results).to_csv(settings.sample_dir / "factor_model_sample.csv")
     print(f"Factor model sample: {len(ff3_results)} tickers")

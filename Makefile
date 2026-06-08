@@ -33,7 +33,7 @@ generate-report:
 	python scripts/generate_report.py
 
 sample-output:
-	python scripts/generate_sample_output.py
+	python3 scripts/generate_sample_output.py
 
 quality:
 	ruff check src/clinical_alpha/ tests/ scripts/
