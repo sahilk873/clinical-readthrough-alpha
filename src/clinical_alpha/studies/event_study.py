@@ -77,7 +77,7 @@ def build_matched_control_basket(
         if peer_caps:
             median_peer_cap = np.median(peer_caps)
             candidate_caps = np.array([market_caps.get(t, 0) for t in candidates])
-            log_peer = np.log(float(max(median_peer_cap, 1)))
+            log_peer = np.log(max(median_peer_cap, 1.0))
             log_candidates = np.log(np.maximum(candidate_caps, 1))
             distances = np.abs(log_candidates - log_peer)
             closest_idx = np.argsort(distances)[: n_controls * 2]
