@@ -420,7 +420,6 @@ def generate_samples():
     mkt = pd.Series(np.random.randn(len(sim_dates)) * 0.01, index=sim_dates, name="Mkt-RF")
     smb = pd.Series(np.random.randn(len(sim_dates)) * 0.008, index=sim_dates, name="SMB")
     hml = pd.Series(np.random.randn(len(sim_dates)) * 0.008, index=sim_dates, name="HML")
-    factors = pd.DataFrame({"Mkt-RF": mkt, "SMB": smb, "HML": hml}, index=sim_dates)
     rf = pd.Series(0.0001, index=sim_dates, name="RF")
     ff3_results = {}
     for ticker in ["PFE", "MRK", "JNJ"]:
